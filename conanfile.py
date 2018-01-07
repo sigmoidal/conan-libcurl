@@ -120,11 +120,11 @@ class LibcurlConan(ConanFile):
                 suffix += "--without-ssl "
 
             if self.options.with_libssh2:
-                suffix += "--with-libssh2=%s " % self.deps_cpp_info["libssh2"].lib_paths[0]
+                suffix += "--with-libssh2=%s " % self.deps_cpp_info["libssh2"].lib_paths[0].replace('\\', '/')
             else:
                 suffix += " --without-libssh2 "
 
-            suffix += "--with-zlib=%s " % self.deps_cpp_info["zlib"].lib_paths[0]
+            suffix += "--with-zlib=%s " % self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/')
 
             if not self.options.shared:
                 suffix += " --disable-shared"
