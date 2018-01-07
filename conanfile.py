@@ -57,6 +57,12 @@ class LibcurlConan(ConanFile):
         if not use_libpsl:
             self.options.remove('with_libpsl')
 
+    def build_requirements(self):
+        if self.settings.os == "Windows":
+            self.build_requires("cygwin_installer/2.9.0@bincrafters/stable")
+            if self.settings.compiler != "Visual Studio":
+                self.build_requires("mingw_installer/1.0@conan/stable")
+                
     def requirements(self):
         if self.options.with_openssl:
             if self.settings.os != "Macos" or not self.options.darwin_ssl:
