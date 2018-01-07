@@ -4,7 +4,6 @@
 from conans import ConanFile, AutoToolsBuildEnvironment, RunEnvironment, CMake, tools
 import os
 
-
 class LibcurlConan(ConanFile):
     name = "libcurl"
     version = "7.52.1"
