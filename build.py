@@ -1,4 +1,4 @@
-from conan.packager import ConanMultiPackager
+from conan.packager import ConanMultiPackager, split_colon_env
 import os, re, platform, copy
 
 
