@@ -59,7 +59,7 @@ class LibcurlConan(ConanFile):
 
     def build_requirements(self):
         if self.settings.os == "Windows":
-            self.build_requires("cygwin_installer/2.9.0@bincrafters/stable")
+            self.build_requires("msys2_installer/latest@bincrafters/stable")
             if self.settings.compiler != "Visual Studio":
                 self.build_requires("mingw_installer/1.0@conan/stable")
                 
@@ -99,6 +99,8 @@ class LibcurlConan(ConanFile):
         if not use_cmake:
 
             suffix = ''
+            suffix += '--prefix=%s' % os.path.join(self.build_folder, 'build').replace('\\', '/')
+            
             use_idn2 = int(version_components[0]) == 7 and int(version_components[1]) >= 53
             if use_idn2:
                 suffix += " --without-libidn2 " if not self.options.with_libidn else " --with-libidn2 "
@@ -124,10 +126,15 @@ class LibcurlConan(ConanFile):
             else:
                 suffix += " --without-libssh2 "
 
-            suffix += "--with-zlib=%s " % self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/')
+            #suffix += "--with-zlib=%s " % self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/')
+            suffix += "--with-zlib=%s " % self.deps_cpp_info["zlib"].rootpath.replace('\\', '/')
 
             if not self.options.shared:
                 suffix += " --disable-shared"
+                suffix += " --enable-static"
+            else:
+                suffix += " --enable-shared"
+                suffix += " --disable-static"
 
             if self.options.disable_threads:
                 suffix += " --disable-thread"
@@ -141,12 +148,20 @@ class LibcurlConan(ConanFile):
             # for mingw
             if self.settings.os == "Windows" and self.settings.compiler == "gcc":
                 if self.settings.arch == "x86_64":
+                    suffix += ' --build=x86_64-w64-mingw32'
                     suffix += ' --host=x86_64-w64-mingw32'
                 if self.settings.arch == "x86":
                     suffix += ' --build=i686-w64-mingw32'
                     suffix += ' --host=i686-w64-mingw32'
 
             env_build = AutoToolsBuildEnvironment(self)
+            
+            if self.settings.os == "Windows" and self.settings.compiler == "gcc":
+                env_build.libs.append("gdi32")
+                #env_build.libs.append("Ws2_32")
+
+            if not self.options.shared:
+                env_build.defines.append("CURL_STATICLIB=1")
 
             self.output.warn(repr(env_build.vars))
 
@@ -161,9 +176,20 @@ class LibcurlConan(ConanFile):
                     for key in env_run_vars.keys():
                         env_run_vars[key] = [s.replace('\\', '/') for s in env_run_vars[key]]
                 self.output.warn(repr(env_run_vars))
+                
+                os.environ['AR'] = os.path.join(os.environ['MINGW_HOME'], 'bin', 'ar').replace('\\', '/')
+                
+                self.output.warn(os.environ['CC'])
+                self.output.warn(os.environ['CXX'])
+                self.output.warn(os.environ['AR'])
+                
                 with tools.environment_append(env_run_vars):
 
+                    self.output.warn(os.environ['PATH'])
+                
                     with tools.chdir(self.name):
+                        os.system('bash -c "autoreconf -vfi"')
+                    
                         # disable rpath build
                         tools.replace_in_file("configure", r"-install_name \$rpath/", "-install_name ")
 
@@ -175,12 +201,15 @@ class LibcurlConan(ConanFile):
                                               'LDFLAGS="$LDFLAGS `$PKGCONFIG --libs-only-L zlib`"',
                                               strict=False)
 
-                        cmd = "./configure %s" % suffix
+                        cmd = "./configure --verbose %s" % suffix
                         self.output.warn(cmd)
                         if self.settings.os == "Windows":
-                            tools.run_in_windows_bash(self, cmd)
+                            #tools.run_in_windows_bash(self, cmd)
+                            os.system('bash -c "' + cmd + '"')
                         else:
-                            self.run(cmd)
+                            # self.run() freezes on mingw
+                            os.system(cmd)
+                            #self.run(cmd)
 
                         # temporary fix for xcode9
                         # extremely fragile because make doesn't see CFLAGS from env, only from cmdline
@@ -192,9 +221,12 @@ class LibcurlConan(ConanFile):
                         cmd = "make %s" % make_suffix
                         self.output.warn(cmd)
                         if self.settings.os == "Windows":
-                            tools.run_in_windows_bash(self, cmd)
+                            #tools.run_in_windows_bash(self, cmd)
+                            os.system('bash -c "' + cmd + '"')
                         else:
-                            self.run(cmd)
+                            # self.run() freezes on mingw
+                            os.system(cmd)
+                            #self.run(cmd)
         else:
             # Do not compile curl tool, just library
             conan_magic_lines = '''project(CURL)
@@ -223,9 +255,9 @@ CONAN_BASIC_SETUP()
 
     def package(self):
         # debug
-        for dirpath, dirs, files in os.walk(self.name):
-            for f in files:
-                self.output.warn(dirpath+'/'+f)
+        #for dirpath, dirs, files in os.walk(self.name):
+        #    for f in files:
+        #        self.output.warn(dirpath+'/'+f)
 
         self.copy("libcurl/COPYING", dst="licenses", ignore_case=True, keep_path=False)
 
@@ -253,6 +285,9 @@ CONAN_BASIC_SETUP()
                 self.copy(pattern="*.a", dst="lib", src=self.name, keep_path=False, links=True)
 
     def package_info(self):
+        self.output.warn("==============================================>>>>>>>>>>>>>>>>>>>>>> THIS IS REALLY NOT HAPPENING")
+        self.output.warn("==============================================>>>>>>>>>>>>>>>>>>>>>> THIS IS REALLY NOT HAPPENING")
+        self.output.warn("==============================================>>>>>>>>>>>>>>>>>>>>>> THIS IS REALLY NOT HAPPENING")
         if self.settings.compiler != "Visual Studio":
             self.cpp_info.libs = ['curl']
             if self.settings.os == "Linux":
