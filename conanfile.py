@@ -5,16 +5,18 @@ from conans import ConanFile, AutoToolsBuildEnvironment, RunEnvironment, CMake, 
 import os
 import shutil
 
+
 # this function joins paths together and inverts path separators.
 def pjoin(*args, **kwargs):
-  return os.path.join(*args, **kwargs).replace(os.path.sep, '/')
+    return os.path.join(*args, **kwargs).replace(os.path.sep, '/')
+
 
 class LibcurlConan(ConanFile):
     name = "libcurl"
     version = "7.52.1"
     generators = "cmake", "txt"
     settings = "os", "arch", "compiler", "build_type"
-    options = {"shared": [True, False], # SHARED IN LINUX IS HAVING PROBLEMS WITH LIBEFENCE
+    options = {"shared": [True, False],  # SHARED IN LINUX IS HAVING PROBLEMS WITH LIBEFENCE
                "with_openssl": [True, False],
                "disable_threads": [True, False],
                "with_ldap": [True, False],
@@ -33,13 +35,14 @@ class LibcurlConan(ConanFile):
                        "with_libmetalink=False", "with_largemaxwritesize=False",
                        "with_libpsl=False", "with_nghttp2=False")
     exports = ["LICENSE.md"]
-    exports_sources = ["FindCURL.cmake", 'patches/*' ]
+    exports_sources = ["FindCURL.cmake", 'patches/*']
 
     url = "http://github.com/bincrafters/conan-libcurl"
     license = "https://curl.haxx.se/docs/copyright.html"
     website = "https://curl.haxx.se"
     description = "command line tool and library for transferring data with URLs"
-    #short_paths = False
+
+    # short_paths = False
 
     def config_options(self):
         version_components = self.version.split('.')
@@ -67,8 +70,7 @@ class LibcurlConan(ConanFile):
         if self.settings.os == "Windows":
             if self.settings.compiler != "Visual Studio":
                 self.build_requires("mingw_installer/1.0@conan/stable")
-
-            self.build_requires("msys2_installer/latest@bincrafters/stable")
+                self.build_requires("msys2_installer/latest@bincrafters/stable")
 
     def requirements(self):
         if self.options.with_openssl:
@@ -84,7 +86,6 @@ class LibcurlConan(ConanFile):
 
     def configure(self):
         self.is_mingw = self.settings.os == "Windows" and self.settings.compiler == "gcc"
-        #self.options["zlib"].shared = self.options.shared
 
     def source(self):
         tools.get("https://curl.haxx.se/download/curl-%s.tar.gz" % self.version)
@@ -103,11 +104,11 @@ class LibcurlConan(ConanFile):
         opt_prefix = 'without' if not optcheck else 'with'
         self.cfg['options'].append("--%s-%s" % (opt_prefix, opt_name))
 
-    def _autotools_config(self):  
+    def _autotools_config(self):
         version_components = self.version.split('.')
-    
-        self.cfg['prefix'] = [ '--prefix=%s' % self.package_folder.replace('\\', '/') ]
-    
+
+        self.cfg['prefix'] = ['--prefix=%s' % self.package_folder.replace('\\', '/')]
+
         self.cfg['options'] = []
 
         use_idn2 = int(version_components[0]) == 7 and int(version_components[1]) >= 53
@@ -136,14 +137,14 @@ class LibcurlConan(ConanFile):
             self.cfg['options'].append("--without-ssl")
 
         if self.options.with_libssh2:
-            self.cfg['options'].append("--with-libssh2=%s" % self.deps_cpp_info["libssh2"].lib_paths[0].replace('\\', '/'))
+            self.cfg['options'].append(
+                "--with-libssh2=%s" % self.deps_cpp_info["libssh2"].lib_paths[0].replace('\\', '/'))
         else:
             self.cfg['options'].append("--without-libssh2")
 
         zlib_path = self.deps_cpp_info["zlib"].rootpath.replace('\\', '/')
 
         self.cfg['options'].append("--with-zlib=%s" % zlib_path)
-
 
         if not self.options.shared:
             self.cfg['options'].append("--disable-shared")
@@ -171,12 +172,11 @@ class LibcurlConan(ConanFile):
                 self.cfg['build'] = 'i686-w64-mingw32'
                 self.cfg['host'] = 'i686-w64-mingw32'
 
-
     def _autotools_bincrafters_build(self):
         version_components = self.version.split('.')
-        
+
         suffix = ''
-        
+
         use_idn2 = int(version_components[0]) == 7 and int(version_components[1]) >= 53
         if use_idn2:
             suffix += " --without-libidn2 " if not self.options.with_libidn else " --with-libidn2 "
@@ -274,6 +274,21 @@ class LibcurlConan(ConanFile):
                     else:
                         self.run(cmd)
 
+    def _autotools_linux(self):
+        env_build = AutoToolsBuildEnvironment(self)
+        env_build_variables = env_build.vars
+
+        with tools.environment_append(env_build_variables):
+            with tools.chdir(self.cfg['src_dir']):
+                self.run(pjoin(self.cfg['src_dir'], 'buildconf'))
+
+            tools.mkdir(self.cfg['build_dir'])
+            with tools.chdir(self.cfg['build_dir']):
+                env_build.configure(configure_dir=self.cfg['src_dir'],
+                                    args=self.cfg['prefix'] + self.cfg['options'])
+
+                env_build.make()
+                env_build.make(args=['install'])
 
     def _autotools_mingw(self):
         if self.is_mingw:
@@ -281,9 +296,6 @@ class LibcurlConan(ConanFile):
             host_cfg = self.cfg['build'] if self.is_mingw else False
 
             env_build = AutoToolsBuildEnvironment(self, win_bash=self.is_mingw)
-
-            #if not self.options.shared:
-            #    env_build.libs.append("gdi32")
 
             env_build_variables = env_build.vars
 
@@ -309,8 +321,8 @@ class LibcurlConan(ConanFile):
 
                     if self.options.shared:
                         # patch for shared mingw build
-                        shutil.copy( pjoin(self.build_folder, 'patches', 'lib_Makefile.am.new') ,
-                                     pjoin(self.cfg['src_dir'], 'lib', 'Makefile.am'))
+                        shutil.copy(pjoin(self.build_folder, 'patches', 'lib_Makefile.am.new'),
+                                    pjoin(self.cfg['src_dir'], 'lib', 'Makefile.am'))
 
                     # remove curl.exe build
                     tools.replace_in_file("Makefile.am",
@@ -323,9 +335,9 @@ class LibcurlConan(ConanFile):
                                           '',
                                           strict=True)
 
-                    self.run(pjoin(self.cfg['src_dir'],'buildconf'), win_bash=self.is_mingw)
+                    self.run(pjoin(self.cfg['src_dir'], 'buildconf'), win_bash=self.is_mingw)
 
-                os.mkdir(self.cfg['build_dir'])
+                tools.mkdir(self.cfg['build_dir'])
                 with tools.chdir(self.cfg['build_dir']):
                     env_build.configure(configure_dir=self.cfg['src_dir'],
                                         args=self.cfg['prefix'] + self.cfg['options'],
@@ -336,13 +348,13 @@ class LibcurlConan(ConanFile):
                     env_build.make(args=['install'])
 
                     # no need to distribute docs/man pages
-                    shutil.rmtree( os.path.join(self.package_folder, 'share', 'man').replace('\\', '/') )
-
+                    shutil.rmtree(os.path.join(self.package_folder, 'share', 'man').replace('\\', '/'))
 
     def _autotools_conan_build(self):
-        self.output.warn('===========================================================================================================')
+        self.output.warn(
+            '===========================================================================================================')
         self.output.warn("Building with Conan Autotools")
-        
+
         env_build = AutoToolsBuildEnvironment(self, win_bash=self.is_mingw)
 
         if self.options.shared:
@@ -363,7 +375,7 @@ class LibcurlConan(ConanFile):
 
         env_build.defines.append("BUILDING_LIBCURL")
 
-        #else:
+        # else:
         #    env_build.libs.append("curl")
 
         build_cfg = self.cfg['build'] if self.is_mingw else False
@@ -387,29 +399,29 @@ class LibcurlConan(ConanFile):
         # just for debug
         self.output.warn(repr(env_build_variables))
 
-        #env_build.configure(configure_dir='sources',
+        # env_build.configure(configure_dir='sources',
         #                    args=self.cfg['prefix'] + self.cfg['options'],
         #                    build=build_cfg,
         #                    host=host_cfg)
 
-        #env_build.make()
-        #env_build.make(args=['V=1', 'install'])
+        # env_build.make()
+        # env_build.make(args=['V=1', 'install'])
 
         with tools.chdir('sources/lib'):
             env_build.make(args=['V=1', '-f', 'Makefile.m32', 'CFG=-zlib-ssl'])
-            #env_build.make(args=['V=1', '-f', 'Makefile.m32', 'install'])
+            # env_build.make(args=['V=1', '-f', 'Makefile.m32', 'install'])
 
-        #with tools.environment_append(env_build_variables):
-        
+        # with tools.environment_append(env_build_variables):
+
         #    env_run = RunEnvironment(self)
-            # run configure with *LD_LIBRARY_PATH env vars
-            # it allows to pick up shared openssl
+        # run configure with *LD_LIBRARY_PATH env vars
+        # it allows to pick up shared openssl
         #    env_run_vars = env_run.vars
-            
+
         #    with tools.environment_append(env_run_vars):
-                #self.output.warn(os.environ['PATH'])
+        # self.output.warn(os.environ['PATH'])
         #        with tools.chdir(self.name):
-                    
+
         #            config_options = self.cfg['prefix'] + ' ' + self.cfg['options']
         #            cmd = "./configure %s" % suffix
         #            self.output.warn(cmd)
@@ -417,20 +429,19 @@ class LibcurlConan(ConanFile):
         #                tools.run_in_windows_bash(self, cmd)
         #            else:
         #                self.run(cmd)
-                        
-                
+
         #            if self.settings.os == "Macos":
         #                make_suffix = "CFLAGS=\"-Wno-unguarded-availability " + env_build.vars['CFLAGS'] + "\""
         #            else:
         #                make_suffix = ''
 
         #            cmd = "make %s" % make_suffix
-                    #if self.settings.os == "Windows":
-                    #    tools.run_in_windows_bash(self, cmd)
-                    #    #self.run('bash -c "' + cmd + '"')
-                    #else:
+        # if self.settings.os == "Windows":
+        #    tools.run_in_windows_bash(self, cmd)
+        #    #self.run('bash -c "' + cmd + '"')
+        # else:
         #            self.run(cmd, win_bash=self.is_mingw)
-                
+
     def _autotools_bare_build(self):
         # need this for static builds under mingw
         if self.settings.os == "Windows" and self.settings.compiler == "gcc":
@@ -439,74 +450,76 @@ class LibcurlConan(ConanFile):
         if not self.options.shared:
             env_build.defines.append("CURL_STATICLIB=1")
 
-
         env_build_variables = env_build.vars
         self.output.warn(repr(env_build_variables))
-                        
-        if self.settings.os == "Windows" and self.settings.compiler == "gcc":                        
+
+        if self.settings.os == "Windows" and self.settings.compiler == "gcc":
             if 'LDFLAGS' in env_build_variables:
                 ldflag_list = env_build_variables['LDFLAGS'].split()
                 ldflag_list_tmp = []
-                
+
                 for it in ldflag_list:
-                    #self.output.warn("[0]: " + '-L' + self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/'))
-                    #self.output.warn("[1]: " + it)
+                    # self.output.warn("[0]: " + '-L' + self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/'))
+                    # self.output.warn("[1]: " + it)
                     if it == '-L' + self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/'):
                         ldflag_list_tmp.insert(0, it)
                     else:
                         ldflag_list_tmp.append(it)
-                
+
                 env_build_variables['LDFLAGS'] = ' '.join(ldflag_list_tmp)
-                                    
+
             if 'CPPFLAGS' in env_build_variables:
                 cppflag_list = env_build_variables['CPPFLAGS'].split()
                 cppflag_list_tmp = []
-                
+
                 for it in cppflag_list:
-                    #self.output.warn("[0]: " + '-L' + self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/'))
-                    #self.output.warn("[1]: " + it)
+                    # self.output.warn("[0]: " + '-L' + self.deps_cpp_info["zlib"].lib_paths[0].replace('\\', '/'))
+                    # self.output.warn("[1]: " + it)
                     if it == '-I' + self.deps_cpp_info["zlib"].include_paths[0].replace('\\', '/'):
                         cppflag_list_tmp.insert(0, it)
                     else:
                         cppflag_list_tmp.append(it)
-                
-                env_build_variables['CPPFLAGS'] = ' '.join(cppflag_list_tmp)   
-                
-        self.output.warn('===========================================================================================================')
+
+                env_build_variables['CPPFLAGS'] = ' '.join(cppflag_list_tmp)
+
+        self.output.warn(
+            '===========================================================================================================')
         self.output.warn(repr(env_build_variables))
-        self.output.warn('===========================================================================================================')
-        
+        self.output.warn(
+            '===========================================================================================================')
+
         with tools.environment_append(env_build_variables):
 
             env_run = RunEnvironment(self)
             # run configure with *LD_LIBRARY_PATH env vars
             # it allows to pick up shared openssl
             env_run_vars = env_run.vars
-            
+
             if self.settings.os == "Windows" and self.settings.compiler == "gcc":
                 # fix for mingw: RunEnvironment provides backslashes while mingw consumes forward slashes
                 for key in env_run_vars.keys():
                     env_run_vars[key] = [s.replace('\\', '/') for s in env_run_vars[key]]
-                                      
 
-            self.output.warn('===========================================================================================================')
+            self.output.warn(
+                '===========================================================================================================')
             self.output.warn(repr(env_run_vars))
-            self.output.warn('===========================================================================================================')
-            
+            self.output.warn(
+                '===========================================================================================================')
+
             os.environ['AR'] = pjoin(os.environ['MINGW_HOME'], 'bin', 'ar')
-            
+
             self.output.warn(os.environ['CC'])
             self.output.warn(os.environ['CXX'])
             self.output.warn(os.environ['AR'])
-            
+
             with tools.environment_append(env_run_vars):
 
-                #self.output.warn(os.environ['PATH'])
+                # self.output.warn(os.environ['PATH'])
 
                 with tools.chdir(self.name):
-                    #self.run('bash -c "./buildconf"')
-                    #self.run('bash -c "autoreconf -vfi"')
-                
+                    # self.run('bash -c "./buildconf"')
+                    # self.run('bash -c "autoreconf -vfi"')
+
                     # disable rpath build
                     tools.replace_in_file("configure", r"-install_name \$rpath/", "-install_name ")
 
@@ -518,21 +531,21 @@ class LibcurlConan(ConanFile):
                                           'LDFLAGS="$LDFLAGS `$PKGCONFIG --libs-only-L zlib`"',
                                           strict=False)
 
-                    #cmd = "./configure --verbose %s" % suffix
-                    #self.output.warn(cmd)
-                    #if self.settings.os == "Windows":
+                    # cmd = "./configure --verbose %s" % suffix
+                    # self.output.warn(cmd)
+                    # if self.settings.os == "Windows":
                     #    #tools.run_in_windows_bash(self, cmd)
                     #    os.system('bash -c "' + cmd + '"')
-                    #else:
+                    # else:
                     #    # self.run() freezes on mingw
                     #    os.system(cmd)
                     #    #self.run(cmd)
-                        
-                    #tools.replace_in_file("Makefile",
+
+                    # tools.replace_in_file("Makefile",
                     #                      'ZLIB_LIBS = -lz',
                     #                      'ZLIB_LIBS = -lzlib',
                     #                      strict=False)
-                                          
+
                     # temporary fix for xcode9
                     # extremely fragile because make doesn't see CFLAGS from env, only from cmdline
                     if self.settings.os == "Macos":
@@ -544,11 +557,11 @@ class LibcurlConan(ConanFile):
                     cmd = "make %s" % make_suffix
                     self.output.warn(cmd)
                     if self.settings.os == "Windows":
-                        #tools.run_in_windows_bash(self, cmd)
+                        # tools.run_in_windows_bash(self, cmd)
                         self.run('bash -c "' + cmd + '"')
                     else:
                         self.run(cmd)
-        
+
     def build(self):
         self.cfg['build_dir'] = pjoin(self.build_folder, 'build')
         self.cfg['src_dir'] = pjoin(self.build_folder, 'sources')
@@ -565,9 +578,12 @@ class LibcurlConan(ConanFile):
         use_cmake = self.settings.compiler == "Visual Studio"
 
         if not use_cmake:
+            self._autotools_config()
             if self.is_mingw:
-                self._autotools_config()
                 self._autotools_mingw()
+
+            if self.settings.os == 'Linux':
+                self._autotools_linux()
         else:
             # Do not compile curl tool, just library
             conan_magic_lines = '''project(CURL)
@@ -589,9 +605,9 @@ CONAN_BASIC_SETUP()
 
             cmakelist_file = pjoin('sources', 'src', 'CMakeLists.txt')
             tools.replace_in_file(cmakelist_file, "add_executable(", "IF(0)\n add_executable(")
-            tools.replace_in_file(cmakelist_file, "install(TARGETS ${EXE_NAME} DESTINATION bin)", "ENDIF()") # EOF
+            tools.replace_in_file(cmakelist_file, "install(TARGETS ${EXE_NAME} DESTINATION bin)", "ENDIF()")  # EOF
 
-            #tools.mkdir(os.path.join(self.name, '_build'))
+            # tools.mkdir(os.path.join(self.name, '_build'))
 
             cmake = CMake(self)
             cmake.definitions['BUILD_TESTING'] = False
@@ -610,7 +626,7 @@ CONAN_BASIC_SETUP()
         self.copy("FindCURL.cmake", ".", ".")
 
         # Copying zlib.h, zutil.h, zconf.h
-        #self.copy("*.h", "include/curl", "%s" % self.name, keep_path=True)
+        # self.copy("*.h", "include/curl", "%s" % self.name, keep_path=True)
 
         # Copy the certs to be used by client
         self.copy(pattern="cacert.pem", keep_path=False)
