@@ -126,7 +126,8 @@ class LibcurlConan(ConanFile):
 
         self._add_cfg_option('nghttp2')
 
-        openssl_path = self.deps_cpp_info["OpenSSL"].rootpath.replace('\\', '/')
+        if self.settings.os != "Macos" or not self.options.darwin_ssl:
+            openssl_path = self.deps_cpp_info["OpenSSL"].rootpath.replace('\\', '/')
 
         if self.options.with_openssl:
             if self.settings.os == "Macos" and self.options.darwin_ssl:
@@ -279,8 +280,9 @@ class LibcurlConan(ConanFile):
         env_build_variables = env_build.vars
 
         with tools.environment_append(env_build_variables):
-            with tools.chdir(self.cfg['src_dir']):
-                self.run(pjoin(self.cfg['src_dir'], 'buildconf'))
+            if self.settings.os != "Macos":
+                with tools.chdir(self.cfg['src_dir']):
+                    self.run(pjoin(self.cfg['src_dir'], 'buildconf'))
 
             tools.mkdir(self.cfg['build_dir'])
             with tools.chdir(self.cfg['build_dir']):
@@ -582,8 +584,8 @@ class LibcurlConan(ConanFile):
             if self.is_mingw:
                 self._autotools_mingw()
 
-            if self.settings.os == 'Linux':
-                self._autotools_linux()
+            #if self.settings.os == 'Linux':
+            self._autotools_linux()
         else:
             # Do not compile curl tool, just library
             conan_magic_lines = '''project(CURL)
